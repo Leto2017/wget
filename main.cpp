@@ -2,17 +2,17 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <string.h>
+#include <unistd.h>
 #include <netdb.h>
 
 int main(int argc, char *argv[])
 {
     struct sockaddr_in server;
-    char* hostname = "www.olx.uz";
+    char* hostname = "www.google.com";
     char ip[100];
     struct hostent *he;
     struct in_addr **addr_list;
     char* message, server_reply[2000];
-    int i;
 
     int socket_desc = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -32,7 +32,7 @@ int main(int argc, char *argv[])
     //also has the ip address in long format only
 	addr_list = (struct in_addr **) he->h_addr_list;
 
-	for(i = 0; addr_list[i] != NULL; i++)
+	for(int i = 0; addr_list[i] != NULL; i++)
 	{
 		//Return the first one;
 		strcpy(ip , inet_ntoa(*addr_list[i]) );
@@ -44,6 +44,7 @@ int main(int argc, char *argv[])
         return 1;
 	}
 
+	puts(ip);
     server.sin_addr.s_addr = inet_addr(ip);
 	server.sin_family = AF_INET;
 	server.sin_port = htons( 80 );
@@ -58,13 +59,16 @@ int main(int argc, char *argv[])
 	puts("Connected\n");
 	puts(hostname);
 
-	char arr[200];
-	message = "GET / HTTP/1.1\r\n\r\nUser-Agent: Mozilla/4.0 (compatible; MSIE5.01;)\r\n\r\nHost: ";
-	strcat(arr, message);
-	strcat(arr, hostname);
-	strcat(arr, "\r\n\r\n");
-	strcat(arr, "Accept: text/html, text/xml\r\n\r\nAccept-Language: en-us, ru-ru\r\n\r\nContent-Type: text/xml; charset=cp1251\r\n\r\nConnection: close");
-	if (send(socket_desc, arr, strlen(arr), 0) < 0)
+	//char arr[200];
+	const char * format = "GET \/ HTTP\/1.1\r\nHost: %s\r\nUser-Agent: fetch.c\r\n\r\n";
+	int status = asprintf(& message, format, hostname);
+    if (status == -1)
+    {
+        printf("asprintf doesn't work");
+        return 1;
+    }
+    //puts(message);
+	if (send(socket_desc, message, strlen(message), 0) < 0)
 	{
         puts("send failed");
         return 1;
@@ -73,13 +77,24 @@ int main(int argc, char *argv[])
 	puts("data send");
 
 	//-recv - calls are used to receive messages from a socket
-	if (recv(socket_desc, server_reply, 2000, 0) < 0)
+	int size_recv , total_size= 0;
+	char chunk[512];
+
+	//loop
+	while(1)
 	{
-        puts("recv failed");
+		memset(chunk ,0 , 512);	//clear the variable
+		if((size_recv =  recv(socket_desc , chunk , 512, 0) ) < 0)
+		{
+			break;
+		}
+		else
+		{
+			printf("%s" , chunk);
+		}
 	}
 
-	puts("reply received");
-	puts(server_reply);
-	//close(socket_desc);
+
+	close(socket_desc);
     return 0;
 }
