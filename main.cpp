@@ -4,6 +4,8 @@
 #include <string.h>
 #include <unistd.h>
 #include <netdb.h>
+#include <fstream>
+using namespace std;
 
 int main(int argc, char *argv[])
 {
@@ -80,7 +82,9 @@ int main(int argc, char *argv[])
 	int size_recv , total_size= 0;
 	char chunk[512];
 
-	//loop
+
+    ofstream fout("index_wget.html");
+    //loop
 	while(1)
 	{
 		memset(chunk ,0 , 512);	//clear the variable
@@ -90,11 +94,12 @@ int main(int argc, char *argv[])
 		}
 		else
 		{
+            fout << chunk;
 			printf("%s" , chunk);
 		}
 	}
 
-
+    fout.close();
 	close(socket_desc);
     return 0;
 }
