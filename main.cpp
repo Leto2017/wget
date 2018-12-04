@@ -19,39 +19,97 @@ static void show_usage(std::string name)
     std::cerr << "Usage: <option(s)> SOURCES"
               << "Options:\n"
               << "\t-h,--help\t\tShow this help message\n"
-              << "\t-d,--destination DESTINATION\tSpecify the destination path"
+              << "\t-u --url=<string> = the http-address to download web-page\n"
+              << "\t-r --recursive       = load pages by links found in the download pages\n"
+              << "\t-l --level=<uint> = глубина рекурсивного скачивания сайта по ссылкам на скачанных страницах\n"
+              << "\t-t --tries=<uint> = число попыток скачать страницу до выдачи ошибки\n"
+              << "\t-n --no-parent    = загружать страницы не выше по иерархии заданной\n"
+              << "\t-i --infile=<path> = путь к входному txt файлу со списком http-ссылок\n"
+              << "\t-s --savedir=<path> = путь до папки, где сохранять html-страницы\n"
+              << "\t-v --verbose = печатать в stdout подробно производимые операции, без этого флага печатать только ошибки\n"
+              << "\t-h --help =  показать как использовать программу, выдать аргументы консоли\n"
               << std::endl;
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char **argv)
 {
-//    if (argc < 2) {
-//        show_usage(argv[0]);
-//        return 1;
-//    }
+    if (argc < 2) {
+        show_usage(argv[0]);
+        return 1;
+    }
 
     char* hostname;
     std::vector <std::string> sources;
-    std::string destination;
+    bool recursive = false, noparent = true;
+    int level = 1, tries = 1;
+    char *filename, *savedir;
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         if ((arg == "-h") || (arg == "--help")) {
             show_usage(argv[0]);
             return 0;
         }
-        else {hostname = argv[1];}
-        //else if ((arg == "-d") || (arg == "--destination")) {
-          //  if (i + 1 < argc) { // Make sure we aren't at the end of argv!
-          //      destination = argv[i++]; // Increment 'i' so we don't get the argument as the next argv[i].
-          //  } else { // Uh-oh, there was no argument to the destination option.
-          //        std::cerr << "--destination option requires one argument." << std::endl;
-          //      return 1;
-          //  }
-        //} else {
-        //    sources.push_back(argv[i]);
-       // }
+        //else {hostname = argv[1];}
+        else if ((arg == "-u") || (arg == "--url")) {
+            if (i + 1 < argc) { // Make sure we aren't at the end of argv!
+                hostname = argv[++i]; // Increment 'i' so we don't get the argument as the next argv[i].
+            } else {
+                  std::cerr << "--url option requires one argument." << std::endl;
+                return 1;
+            }
+        }
+        else if ((arg == "-r") || (arg == "--recursive")) {
+            if (i + 1 < argc) { // Make sure we aren't at the end of argv!
+                recursive = (argv[++i]=="yes"); // Increment 'i' so we don't get the argument as the next argv[i].
+            } else {
+                  std::cerr << "--recursive option requires one argument yes/no." << std::endl;
+                return 1;
+            }
+        }
+        else if ((arg == "-l") || (arg == "--level")) {
+            if (i + 1 < argc) { // Make sure we aren't at the end of argv!
+                level = atoi(argv[++i]); // Increment 'i' so we don't get the argument as the next argv[i].
+            } else {
+                  std::cerr << "--level option requires one argument." << std::endl;
+                return 1;
+            }
+        }
+        else if ((arg == "-t") || (arg == "--tries")) {
+            if (i + 1 < argc) { // Make sure we aren't at the end of argv!
+                tries = atoi(argv[++i]); // Increment 'i' so we don't get the argument as the next argv[i].
+            } else {
+                  std::cerr << "--tries option requires one argument." << std::endl;
+                return 1;
+            }
+        }
+        else if ((arg == "-n") || (arg == "--no-parent")) {
+            if (i + 1 < argc) { // Make sure we aren't at the end of argv!
+                noparent = (argv[++i]=="yes"); // Increment 'i' so we don't get the argument as the next argv[i].
+            } else {
+                  std::cerr << "--no-parent option requires one argument yes/no." << std::endl;
+                return 1;
+            }
+        }
+        else if ((arg == "-i") || (arg == "--infile")) {
+            if (i + 1 < argc) { // Make sure we aren't at the end of argv!
+                filename = argv[++i]; // Increment 'i' so we don't get the argument as the next argv[i].
+            } else {
+                  std::cerr << "--infile option requires one argument - file name." << std::endl;
+                return 1;
+            }
+        }
+        else if ((arg == "-s") || (arg == "--savedir")) {
+            if (i + 1 < argc) { // Make sure we aren't at the end of argv!
+                savedir= argv[++i]; // Increment 'i' so we don't get the argument as the next argv[i].
+            } else {
+                  std::cerr << "--savedir option requires one argument." << std::endl;
+                return 1;
+            }
+        }
+        else {
+            sources.push_back(argv[i]);
+        }
     }
-
     //create socket
     int socket_desc = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -92,7 +150,7 @@ int read(char* address, int socket_desc, char* hostname)
 
 	char* message;
 	const char * format = "GET / HTTP/1.1\r\nHost: %s\r\nUser-Agent: fetch.c\r\n\r\n";
-	int status = asprintf(& message, format, hostname);
+	int status = asprintf(& message, format, "https://www.yandex.ru/");
     if (status == -1)
     {
         printf("asprintf doesn't work");
