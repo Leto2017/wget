@@ -163,7 +163,23 @@ void parse_html( vector<char*> &link_list, string filename, char* hostname, bool
 								sub="";
 							}
 						}
+						else
+						{
+							if(!tmp.substr(0,1).compare("/"))
+							{
+								buf = "http://";
+								buf.append((string)hostname);
+								buf.append(tmp);
+								tmp=buf;
+
+								printf("%s\n", tmp.c_str());
+								link_list.push_back((char*)tmp.c_str());
+							}
+						}
 						tmp="";
+						slash_cnt=0;
+						buf="";
+						sub="";
 						addr=false;
 						
 					}
