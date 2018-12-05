@@ -219,28 +219,67 @@ void parse_hostname(string addr, string &protocol, string &hostname, string &tai
 	string buf_h="";
 	string buf_p="";
 	string buf_t="";
+	string buf_w="";
+	string buf_wh="";
 
 	int i, slash_count=0;
 	
-	for(i=0; i<addr.length(); i++)
+	if(addr.substr(0,7).compare("http://")!=0 && addr.substr(0,8).compare("https://")!=0 && addr.substr(0,6).compare("ftp://")!=0)
 	{
-		if(slash_count<2)
+		for(i=0; i<addr.length(); i++)
 		{
-			buf_p.push_back(addr[i]);
+			if(slash_count==0)
+			{
+				if(addr[i]=='/') slash_count++;
+				else
+				{
+					buf_h.push_back(addr[i]);
 
-			if(addr[i]=='/') slash_count++;
+					if(buf_w.length()<4) buf_w.push_back(addr[i]);
+					else buf_wh.push_back(addr[i]); 
+				}
+			}
+			else buf_t.push_back(addr[i]);
 		}
-		else if(slash_count==2)
-		{
-			if(addr[i]!='/') buf_h.push_back(addr[i]);
-			else slash_count++;
-		}
-		else buf_t.push_back(addr[i]);
+
+		if(!buf_w.compare("www.")) hostname = buf_wh;
+		else hostname = buf_h;
+
+		protocol = "";
+		
+		tail = buf_t;
 	}
+	else
+	{
+		for(i=0; i<addr.length(); i++)
+		{
+			if(slash_count<2)
+			{
+				buf_p.push_back(addr[i]);
 
-	
-	protocol = buf_p;
-	hostname = buf_h;
-	tail = buf_t;
+				if(addr[i]=='/') slash_count++;
+			}
+			else if(slash_count==2)
+			{	
+				if(addr[i]!='/') 
+				{
+					if(buf_w.length()<4) buf_w.push_back(addr[i]);
+					else buf_wh.push_back(addr[i]);
+
+					buf_h.push_back(addr[i]);
+				}
+
+				else slash_count++;
+			}
+			else buf_t.push_back(addr[i]);
+		}
+
+		if(!buf_w.compare("www.")) hostname = buf_wh;
+		else hostname = buf_h;
+
+		protocol = buf_p;
+		
+		tail = buf_t;
+	}
 }
 
