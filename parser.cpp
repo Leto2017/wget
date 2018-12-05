@@ -44,6 +44,7 @@ void parse_html( vector<string> &link_list, string filename, char* hostname, boo
 	string tmp = "";
 	string buf = "";
 	string sub="";
+	string buf_w="";
 
 	char current[50];
 
@@ -101,7 +102,14 @@ void parse_html( vector<string> &link_list, string filename, char* hostname, boo
 							if(*(pos+i)!='\"') 
 							{
 								c = *(pos+i);
-								if(c!=0) tmp.push_back(c);
+								if(c!=0) 
+								{
+									tmp.push_back(c);
+									if(slash_cnt==2)
+									{
+										if(buf_w.length()<4) buf_w.push_back(c);
+									}
+								}
 
 								if(c=='/') 
 								{
@@ -128,6 +136,8 @@ void parse_html( vector<string> &link_list, string filename, char* hostname, boo
 						{
 							if(no_parent)
 							{
+								if(!buf_w.compare("www.")) beg=beg+4;
+								
 								buf = tmp.substr(beg, tmp.length());
 								size = string(hostname).length();
 								sub = buf.substr(0,size);
@@ -143,9 +153,12 @@ void parse_html( vector<string> &link_list, string filename, char* hostname, boo
 								slash_cnt=0;
 								buf="";
 								sub="";
+								buf_w="";
 							}
 							else
 							{
+								if(!buf_w.compare("www.")) beg=beg+4;
+								
 								buf = tmp.substr(beg, end-beg);
 								sub = (string)hostname;
 								size = buf.length();
@@ -161,6 +174,7 @@ void parse_html( vector<string> &link_list, string filename, char* hostname, boo
 								slash_cnt=0;
 								buf="";
 								sub="";
+								buf_w="";
 							}
 						}
 						else
@@ -180,6 +194,7 @@ void parse_html( vector<string> &link_list, string filename, char* hostname, boo
 						slash_cnt=0;
 						buf="";
 						sub="";
+						buf_w="";
 						addr=false;
 						
 					}
