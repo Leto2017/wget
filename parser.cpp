@@ -283,3 +283,92 @@ void parse_hostname(string addr, string &protocol, string &hostname, string &tai
 	}
 }
 
+void parse_error(string filename, string &error, int& err_num, string &location)
+{
+	string tmp = "";
+	string buf = "";
+
+	char current[50];
+
+	bool end=false;
+	bool loc=false;
+
+	FILE *f;
+	
+	err_num=0;
+
+	char *pos;
+	
+	char c;
+
+	
+	f = fopen(filename.c_str(), "r");
+
+	fgets(current, sizeof(current), f);
+
+	pos = strstr(current, " ")+1;
+
+	int i=0;
+
+	while(*(pos+i)!=' ')
+	{
+		err_num = err_num*10 + (*(pos+i)-'0');
+		i++;
+	}
+		
+	i++;
+
+	while(!end)
+	{
+		while(*(pos+i)!='\n')
+		{
+			if(pos+i==current+50) break;
+
+			error.push_back(*(pos+i));
+			i++;
+		}
+
+		if((pos+i)!= current+50) end=true;
+		else fgets(current, sizeof(current), f);
+			
+	}
+
+	end=false;
+
+	if(err_num!=301) location="";
+	else
+	{
+		while(!end)
+		{
+			fgets(current, sizeof(current), f);
+
+			if(strstr(current, "Location:")==current)
+			{
+				pos = current+10;
+
+				int i=0;
+				
+				while(!end)
+				{
+					while(*(pos+i)!='\n')
+					{
+						if(pos+i==current+50) break;
+
+						location.push_back(*(pos+i));
+						i++;
+					}
+
+					if((pos+i)!= current+50) end=true;
+					else fgets(current, sizeof(current), f);
+				}
+
+			}
+		}
+		
+	}
+
+	fclose(f);
+
+	//printf("%d %s\n", err_num, error.c_str());
+
+}
