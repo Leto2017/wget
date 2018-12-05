@@ -39,7 +39,7 @@ void parse_text( vector<string> &link_list, string string_to_parse)
 	}
 }
 
-void parse_html( vector<char*> &link_list, string filename, char* hostname, bool no_parent, int lvl)
+void parse_html( vector<string> &link_list, string filename, char* hostname, bool no_parent, int lvl)
 {
 	string tmp = "";
 	string buf = "";
@@ -49,7 +49,7 @@ void parse_html( vector<char*> &link_list, string filename, char* hostname, bool
 
 
 	bool addr=false;
-	//bool end=true;
+
 	bool res;
 
 	FILE *f;
@@ -135,8 +135,8 @@ void parse_html( vector<char*> &link_list, string filename, char* hostname, bool
 
 								if(!res)
 								{
-									printf("%s\n", tmp.c_str());
-									link_list.push_back((char*)tmp.c_str());
+									//printf("%s\n", tmp.c_str());
+									link_list.push_back(tmp);
 								}
 						
 								cur_lvl=1;
@@ -153,8 +153,8 @@ void parse_html( vector<char*> &link_list, string filename, char* hostname, bool
 
 								if(!res)
 								{
-									printf("%s\n", tmp.c_str());
-									link_list.push_back((char*)tmp.c_str());
+									//printf("%s\n", tmp.c_str());							
+									link_list.push_back(tmp);
 								}
 						
 								cur_lvl=1;
@@ -172,8 +172,8 @@ void parse_html( vector<char*> &link_list, string filename, char* hostname, bool
 								buf.append(tmp);
 								tmp=buf;
 
-								printf("%s\n", tmp.c_str());
-								link_list.push_back((char*)tmp.c_str());
+								//printf("%s\n", tmp.c_str());
+								link_list.push_back(tmp);
 							}
 						}
 						tmp="";
@@ -195,21 +195,37 @@ void parse_html( vector<char*> &link_list, string filename, char* hostname, bool
 	else
 	{
 		printf("%s\n", hostname);
-		link_list.push_back(hostname);
+		link_list.push_back((string)hostname);
 	}
 }
 
-int main()
+void parse_hostname(string addr, string &protocol, string &hostname, string &tail)
 {
-	vector<string> vec;
-	vector<char*> vec1;
+	string buf_h="";
+	string buf_p="";
+	string buf_t="";
 
-	string str="I love sites like http://google.com , а если на русском, то https://yandex.ru";
+	int i, slash_count=0;
+	
+	for(i=0; i<addr.length(); i++)
+	{
+		if(slash_count<2)
+		{
+			buf_p.push_back(addr[i]);
 
-	parse_text(vec, str);
+			if(addr[i]=='/') slash_count++;
+		}
+		else if(slash_count==2)
+		{
+			if(addr[i]!='/') buf_h.push_back(addr[i]);
+			else slash_count++;
+		}
+		else buf_t.push_back(addr[i]);
+	}
 
-	//for(int i=0; i<vec.size(); i++)
-	//	printf("%s\n", vec[i].c_str());
-
-	parse_html(vec1, "in.txt", "msu.uz", false, 2);
+	
+	protocol = buf_p;
+	hostname = buf_h;
+	tail = buf_t;
 }
+
