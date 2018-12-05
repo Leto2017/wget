@@ -235,15 +235,16 @@ void parse_hostname(string addr, string &protocol, string &hostname, string &tai
 				{
 					buf_h.push_back(addr[i]);
 
-					if(buf_w.length()<4) buf_w.push_back(addr[i]);
-					else buf_wh.push_back(addr[i]); 
+					//if(buf_w.length()<4) buf_w.push_back(addr[i]);
+					//else buf_wh.push_back(addr[i]); 
 				}
 			}
 			else buf_t.push_back(addr[i]);
 		}
 
-		if(!buf_w.compare("www.")) hostname = buf_wh;
-		else hostname = buf_h;
+		//if(!buf_w.compare("www.")) hostname = buf_wh;
+		//else 
+		hostname = buf_h;
 
 		protocol = "";
 		
