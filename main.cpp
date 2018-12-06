@@ -8,17 +8,29 @@
 #include <vector>
 #include <cctype>
 #include <iostream>
+#include <regex>
+#include <stdlib.h>
+#include <getopt.h>
+#include <algorithm>
+#include <sys/stat.h>
+#include <sys/types.h>
+
+#include "parser.cpp"
+
 using namespace std;
 
 void getHost_byName(char* hostname, char* ip);
 int read(char* address, int socket_desc, char* hostname);
 string getFileName(char* hostname);
+int process(char *hostname, int socket_desc);
 
+string hm;
+string protocol;
+string tail;
 static void show_usage(std::string name)
 {
     std::cerr << "Usage: <option(s)> SOURCES"
               << "Options:\n"
-              << "\t-h,--help\t\tShow this help message\n"
               << "\t-u --url=<string> = the http-address to download web-page\n"
               << "\t-r --recursive       = load pages by links found in the download pages\n"
               << "\t-l --level=<uint> = глубина рекурсивного скачивания сайта по ссылкам на скачанных страницах\n"
@@ -30,6 +42,29 @@ static void show_usage(std::string name)
               << "\t-h --help =  показать как использовать программу, выдать аргументы консоли\n"
               << std::endl;
 }
+static const char *optString = "hu:rl:t:n:i:s:v?";
+static const struct option longOpts[] = {
+    { "help", no_argument, NULL, 'h' },
+    { "url", required_argument, NULL, 'u' },
+    { "level", required_argument, NULL, 'l' },
+    { "tries", required_argument, NULL, 't' },
+    { "infile", required_argument, NULL, 'i' },
+    { "savedir", required_argument, NULL, 's' },
+    { "verbose", no_argument, NULL, 'v' },
+    { "recursive", no_argument, NULL, 'r' },
+    { "no-parent", no_argument, NULL, 'n' },
+    { NULL, no_argument, NULL, 0 }
+    };
+
+static struct globalArgs_t {
+    bool recursive;
+    bool noparent;
+    bool verbosity;
+    int level;
+    int tries;
+    std::string filename;
+    std::string savedir;
+} globalArgs;
 
 int main(int argc, char **argv)
 {
@@ -38,77 +73,71 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    globalArgs.recursive = false;
+    globalArgs.noparent = false;
+    globalArgs.verbosity = false;
+    globalArgs.level = 1;
+    globalArgs.tries = 1;
+
     char* hostname;
-    std::vector <std::string> sources;
-    bool recursive = false, noparent = true;
-    int level = 1, tries = 1;
-    char *filename, *savedir;
-    for (int i = 1; i < argc; ++i) {
-        std::string arg = argv[i];
-        if ((arg == "-h") || (arg == "--help")) {
-            show_usage(argv[0]);
-            return 0;
+    if (globalArgs.verbosity)
+    {
+        puts("Start");
+    }
+
+    int opt = 0;
+
+    int longIndex;
+    opt = getopt_long( argc, argv, optString, longOpts, &longIndex );
+    while( opt != -1 ) {
+        switch( opt ) {
+            case 'h':
+            case '?':
+                show_usage(argv[0]);
+                return 0;
+
+            case 'u':
+                 hostname = optarg;
+                break;
+
+            case 'l':
+                globalArgs.level = atoi(optarg);
+                break;
+
+            case 't':
+                globalArgs.tries = atoi(optarg);
+                break;
+
+            case 'i':
+                globalArgs.filename = static_cast<std::string>(optarg);
+                break;
+
+            case 's':
+                globalArgs.savedir = static_cast<std::string>(optarg);
+                break;
+
+            case 'n':
+                globalArgs.noparent = true;
+                break;
+
+            case 'r':
+                globalArgs.recursive = true;
+                break;
+
+            case 'v':
+                globalArgs.verbosity = true;
+                break;
+
+            default:
+                break;
         }
-        //else {hostname = argv[1];}
-        else if ((arg == "-u") || (arg == "--url")) {
-            if (i + 1 < argc) { // Make sure we aren't at the end of argv!
-                hostname = argv[++i]; // Increment 'i' so we don't get the argument as the next argv[i].
-            } else {
-                  std::cerr << "--url option requires one argument." << std::endl;
-                return 1;
-            }
-        }
-        else if ((arg == "-r") || (arg == "--recursive")) {
-            if (i + 1 < argc) { // Make sure we aren't at the end of argv!
-                recursive = (argv[++i]=="yes"); // Increment 'i' so we don't get the argument as the next argv[i].
-            } else {
-                  std::cerr << "--recursive option requires one argument yes/no." << std::endl;
-                return 1;
-            }
-        }
-        else if ((arg == "-l") || (arg == "--level")) {
-            if (i + 1 < argc) { // Make sure we aren't at the end of argv!
-                level = atoi(argv[++i]); // Increment 'i' so we don't get the argument as the next argv[i].
-            } else {
-                  std::cerr << "--level option requires one argument." << std::endl;
-                return 1;
-            }
-        }
-        else if ((arg == "-t") || (arg == "--tries")) {
-            if (i + 1 < argc) { // Make sure we aren't at the end of argv!
-                tries = atoi(argv[++i]); // Increment 'i' so we don't get the argument as the next argv[i].
-            } else {
-                  std::cerr << "--tries option requires one argument." << std::endl;
-                return 1;
-            }
-        }
-        else if ((arg == "-n") || (arg == "--no-parent")) {
-            if (i + 1 < argc) { // Make sure we aren't at the end of argv!
-                noparent = (argv[++i]=="yes"); // Increment 'i' so we don't get the argument as the next argv[i].
-            } else {
-                  std::cerr << "--no-parent option requires one argument yes/no." << std::endl;
-                return 1;
-            }
-        }
-        else if ((arg == "-i") || (arg == "--infile")) {
-            if (i + 1 < argc) { // Make sure we aren't at the end of argv!
-                filename = argv[++i]; // Increment 'i' so we don't get the argument as the next argv[i].
-            } else {
-                  std::cerr << "--infile option requires one argument - file name." << std::endl;
-                return 1;
-            }
-        }
-        else if ((arg == "-s") || (arg == "--savedir")) {
-            if (i + 1 < argc) { // Make sure we aren't at the end of argv!
-                savedir= argv[++i]; // Increment 'i' so we don't get the argument as the next argv[i].
-            } else {
-                  std::cerr << "--savedir option requires one argument." << std::endl;
-                return 1;
-            }
-        }
-        else {
-            sources.push_back(argv[i]);
-        }
+
+        opt = getopt_long( argc, argv, optString, longOpts, &longIndex );
+    }
+
+    if (globalArgs.verbosity)
+    {
+        puts("Create socket");
     }
     //create socket
     int socket_desc = socket(AF_INET, SOCK_STREAM, 0);
@@ -116,18 +145,82 @@ int main(int argc, char **argv)
     if (socket_desc == -1)
     {
         puts("could not create socket");
-
+        return 1;
     }
 
+    if (!globalArgs.filename.empty())
+    {
+        puts("Reading urls from file");
+        std::string s;
+        ifstream file(globalArgs.filename);
+
+        while(getline(file, s)){
+            cout << s << endl;
+            process(const_cast<char*>(s.c_str()), socket_desc);
+        }
+
+        file.close();
+    }
+
+    if (globalArgs.verbosity)
+    {
+        puts("Process");
+    }
+    int success = process(hostname, socket_desc);
+    if (success != 0)
+    {
+        puts("Can't process");
+        return 1;
+    }
+
+    if (globalArgs.verbosity)
+    {
+        puts("Close socket");
+    }
+	close(socket_desc);
+    return 0;
+}
+
+int process(char *hostname, int socket_desc)
+{
     char* ip = new char;
-    getHost_byName(hostname, ip);
+
+    if (globalArgs.verbosity)
+    {
+        puts("Parse url");
+    }
+    parse_hostname(string(hostname), protocol, hm, tail);
+    if (!protocol.empty() && hm.empty())
+    {
+        hm = protocol;
+        protocol.clear();
+    }
+    //puts(const_cast<char*>(hm.c_str()));
+    //puts(const_cast<char*>(protocol.c_str()));
+    //puts(const_cast<char*>(tail.c_str()));
+
+    //puts(hostname);
+
+    if (globalArgs.verbosity)
+    {
+        puts("Get host by name");
+    }
+    getHost_byName(const_cast<char*>(hm.c_str()), ip);
+    //puts(ip);
+
+    if (globalArgs.verbosity)
+    {
+        puts("Read");
+    }
     int success = read(ip, socket_desc, hostname);
     if (success != 0)
     {
-        puts("Error");
+        puts("Cann't read");
+        return 1;
     }
-
-	close(socket_desc);
+    hm.clear();
+    protocol.clear();
+    tail.clear();
     return 0;
 }
 
@@ -139,38 +232,61 @@ int read(char* address, int socket_desc, char* hostname)
 	server.sin_family = AF_INET;
 	server.sin_port = htons( 80 );
 	//Connect to remote server
+	if (globalArgs.verbosity)
+    {
+        puts("Connect to remote server");
+    }
 	if (connect(socket_desc , (struct sockaddr *)&server , sizeof(server)) < 0)
 	{
 		puts("connect error");
 		return 1;
 	}
 
-	puts("Connected\n");
-	puts(hostname);
+	if (globalArgs.verbosity)
+    {
+        puts("Connected\n");
+//        puts(hostname);
+    }
 
 	char* message;
-	const char * format = "GET / HTTP/1.1\r\nHost: %s\r\nUser-Agent: fetch.c\r\n\r\n";
-	int status = asprintf(& message, format, "https://www.yandex.ru/");
-    if (status == -1)
+	const char * format = "GET %s HTTP/1.1\r\nHost: %s\r\n\r\n";
+	if (tail.empty())
+        tail = "/";
+
+    int status = asprintf(& message, format, tail.c_str(), hm.c_str());
+
+	if (status == -1)
     {
         printf("asprintf doesn't work");
         return 1;
     }
-    //puts(message);
-	if (send(socket_desc, message, strlen(message), 0) < 0)
+
+    if (globalArgs.verbosity)
+    {
+        puts("Send message:");
+        puts(message);
+    }
+    if (send(socket_desc, message, strlen(message), 0) < 0)
 	{
         puts("send failed");
         return 1;
 	}
 
-	puts("data send");
-
 	//-recv - calls are used to receive messages from a socket
 	int size_recv , total_size= 0, BLOCK_SIZE = 512;
 	char chunk[BLOCK_SIZE];
-
-    ofstream fout(getFileName(hostname));
-	//loop
+    if (globalArgs.verbosity)
+    {
+        puts("Receiving answer ... ");
+    }
+    if (!globalArgs.savedir.empty())
+    {
+        const int dir=mkdir(const_cast<char*>(globalArgs.savedir.c_str()),S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+    }
+    string filename = getFileName(hostname);
+    ofstream fout(filename + ".html");
+    string resulte;
+    //loop
 	while(1)
 	{
 		memset(chunk ,0 , BLOCK_SIZE);	//clear the variable
@@ -181,38 +297,32 @@ int read(char* address, int socket_desc, char* hostname)
 		else
 		{
             fout << chunk;
-			printf("%s" , chunk);
+            resulte += string(chunk);
+
+            if (globalArgs.verbosity)
+                printf("%s" , chunk);
 		}
 	}
-
+    cout  <<sizeof(resulte)<<resulte <<endl;
     fout.close();
     return 0;
 }
 
 string getFileName(char* hostname)
 {
-    string str = hostname;
-	string str2="";
-
-    for (const auto c: str)
+    if (globalArgs.verbosity)
     {
-
-        if(!ispunct(c)){
-
-            str2.push_back(c);
-        }
+        puts("Get filename");
     }
 
-    char *outputFileName;
-	const char* outputFileNameFormat = "%s.html";
-	int status2 = asprintf(& outputFileName, outputFileNameFormat, str2.c_str());
-	if (status2 == -1)
+    std::string str = hostname;
+    str.erase(std::remove_if(str.begin(), str.end(), ::ispunct), str.end());
+    if (!globalArgs.savedir.empty())
     {
-        printf("asprintf doesn't work");
+        str = globalArgs.savedir + "/" + str;
     }
-    puts(outputFileName);
-    string res(outputFileName);
-    return res;
+    cout << str + ".html" << endl;
+    return str;
 }
 
 void getHost_byName(char* hostname, char *ip)
@@ -232,7 +342,6 @@ void getHost_byName(char* hostname, char *ip)
 
 	for(int i = 0; addr_list[i] != NULL; i++)
 	{
-		//Return the first one;
 		strcpy(ip , inet_ntoa(*addr_list[i]) );
 	}
 
@@ -242,3 +351,5 @@ void getHost_byName(char* hostname, char *ip)
         return;
 	}
 }
+
+
