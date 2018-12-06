@@ -374,3 +374,76 @@ void parse_error(string filename, string &error, int& err_num, string &location)
 	//printf("%d %s\n", err_num, error.c_str());
 
 }
+
+void parse_error_msg(char* message, string &error, int& err_num, string &location)
+{
+	string tmp = "";
+	string buf = "";
+
+	char current[50];
+
+
+	bool end=false;
+	bool loc=false;
+	
+	err_num=0;
+
+	char *pos;
+	
+	char c;
+
+	pos = strstr(message, " ")+1;
+
+	int i=0;
+
+	while(*(pos+i)!=' ')
+	{
+		err_num = err_num*10 + (*(pos+i)-'0');
+		i++;
+	}
+		
+	i++;
+
+
+	while(*(pos+i)!='\n')
+	{
+
+		error.push_back(*(pos+i));
+		i++;
+	}
+			
+
+	if(err_num!=301) location="";
+	else
+	{
+		while(!end)
+		{
+			//fgets(current, sizeof(current), f);
+
+			pos = strstr(message, "Location:");
+			
+			pos = pos+10;
+
+			int i=0;
+				
+			while(!end)
+			{
+				while(*(pos+i)!='\n')
+				{
+					//if(pos+i==current+50) break;
+
+					location.push_back(*(pos+i));
+					i++;
+				}
+
+				end=true;
+			}
+
+		}
+	}
+		
+
+
+	//printf("%d %s\n", err_num, error.c_str());
+
+}
