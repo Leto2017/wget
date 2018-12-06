@@ -218,7 +218,7 @@ void parse_hostname(string addr, string &protocol, string &hostname, string &tai
 {
 	string buf_h="";
 	string buf_p="";
-	string buf_t="";
+	string buf_t="/";
 	string buf_w="";
 	string buf_wh="";
 
