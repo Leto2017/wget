@@ -23,10 +23,13 @@ void getHost_byName(char* hostname, char* ip);
 int read(char* address, int socket_desc, char* hostname);
 string getFileName(char* hostname);
 int process(char *hostname, int socket_desc);
+int readSubLinks();
 
 string hm;
 string protocol;
 string tail;
+
+char* fileNameToParse;
 static void show_usage(std::string name)
 {
     std::cerr << "Usage: <option(s)> SOURCES"
@@ -56,7 +59,8 @@ static const struct option longOpts[] = {
     { NULL, no_argument, NULL, 0 }
     };
 
-static struct globalArgs_t {
+static struct globalArgs_t
+{
     bool recursive;
     bool noparent;
     bool verbosity;
@@ -66,6 +70,14 @@ static struct globalArgs_t {
     std::string savedir;
 } globalArgs;
 
+
+static struct returnCodeStruct
+{
+    std::string error;
+    std::string location;
+    int code;
+} returnCode;
+
 int main(int argc, char **argv)
 {
     if (argc < 2) {
@@ -73,6 +85,7 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    returnCode.code = 0;
     globalArgs.recursive = false;
     globalArgs.noparent = false;
     globalArgs.verbosity = false;
@@ -206,22 +219,77 @@ int process(char *hostname, int socket_desc)
         puts("Get host by name");
     }
     getHost_byName(const_cast<char*>(hm.c_str()), ip);
-    //puts(ip);
+
+    if (globalArgs.verbosity)
+    {
+        cout << "IP: ";
+        puts(ip);
+    }
 
     if (globalArgs.verbosity)
     {
         puts("Read");
     }
     int success = read(ip, socket_desc, hostname);
-    if (success != 0)
+    if (success == 1)
     {
+        if (returnCode.code > 0 && (globalArgs.tries > 0))
+        {
+            socket_desc = socket(AF_INET, SOCK_STREAM, 0);
+
+            if (socket_desc == -1)
+            {
+                puts("could not create socket");
+                return 1;
+            }
+            globalArgs.tries -= 1;
+            if (globalArgs.verbosity)
+            {
+                cout << "New location "<< returnCode.location <<endl ;
+                cout << "Attempt number: " << globalArgs.tries << endl;
+            }
+            process(const_cast<char*>(returnCode.location.c_str()), socket_desc);
+        }
         puts("Cann't read");
         return 1;
+    }
+    else if (success == 2)
+    {
+        int ok = readSubLinks();
     }
     hm.clear();
     protocol.clear();
     tail.clear();
     return 0;
+}
+
+int readSubLinks()
+{
+     vector<string> linkList;
+     cout << "parsehtml()"<<linkList.size() << endl;
+     parse_html(linkList, fileNameToParse, const_cast<char*>(hm.c_str()), globalArgs.noparent, globalArgs.level);
+
+     cout << "size"<<linkList.size() << endl;
+     if (!linkList.empty())
+     {
+         for(string i : linkList)
+         {
+                int socket_desc = socket(AF_INET, SOCK_STREAM, 0);
+
+                if (socket_desc == -1)
+                {
+                    puts("could not create socket");
+                    return 1;
+                }
+                if (globalArgs.verbosity)
+                {
+                    cout << "Link to process: "<< i <<endl ;
+                }
+                process(const_cast<char*>(const_cast<char*> (i.c_str())), socket_desc);
+          }
+      }
+
+      return 0;
 }
 
 int read(char* address, int socket_desc, char* hostname)
@@ -249,7 +317,7 @@ int read(char* address, int socket_desc, char* hostname)
     }
 
 	char* message;
-	const char * format = "GET %s HTTP/1.1\r\nHost: %s\r\n\r\n";
+	const char * format = "GET %s HTTP/1.1\r\nHost: %s\r\nUser-Agent: Mozilla/5.0 (X11; U; Linux i686; ru; rv:1.9b5) Gecko/2008050509 Firefox/3.0b5\r\nAccept: text/html\r\nConnection: close\r\n\r\n";
 	if (tail.empty())
         tail = "/";
 
@@ -284,27 +352,41 @@ int read(char* address, int socket_desc, char* hostname)
         const int dir=mkdir(const_cast<char*>(globalArgs.savedir.c_str()),S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
     }
     string filename = getFileName(hostname);
-    ofstream fout(filename + ".html");
-    string resulte;
+    ofstream fout(filename);
+
     //loop
 	while(1)
 	{
 		memset(chunk ,0 , BLOCK_SIZE);	//clear the variable
-		if((size_recv = recv(socket_desc , chunk , BLOCK_SIZE, 0) ) < 0)
+		if((size_recv = recv(socket_desc , chunk , BLOCK_SIZE, 0) ) == 0)
 		{
 			break;
 		}
 		else
 		{
             fout << chunk;
-            resulte += string(chunk);
-
             if (globalArgs.verbosity)
                 printf("%s" , chunk);
 		}
 	}
-    cout  <<sizeof(resulte)<<resulte <<endl;
     fout.close();
+
+    if (globalArgs.verbosity)
+        puts("Analize response");
+    parse_error(filename, returnCode.error, returnCode.code, returnCode.location);
+    if (returnCode.code != 200 && (globalArgs.tries > 0))
+    {
+        if (globalArgs.verbosity)
+            cout << "Status code: " << returnCode.code << endl;
+        return 1;
+    }
+
+    if (returnCode.code == 200 && globalArgs.recursive && globalArgs.level > 1)
+    {
+        puts("Recursive");
+        fileNameToParse = const_cast<char*>(filename.c_str());
+        return 2;
+    }
     return 0;
 }
 
@@ -321,7 +403,10 @@ string getFileName(char* hostname)
     {
         str = globalArgs.savedir + "/" + str;
     }
-    cout << str + ".html" << endl;
+
+    str += ".html";
+    if (globalArgs.verbosity)
+        cout << "Filename: "<< str << endl;
     return str;
 }
 
@@ -347,7 +432,7 @@ void getHost_byName(char* hostname, char *ip)
 
 	if (strlen(ip) == 0)
 	{
-        puts("cannot get ip from hostname");
+        puts("Cannot get ip from hostname");
         return;
 	}
 }
