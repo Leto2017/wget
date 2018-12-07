@@ -19,17 +19,18 @@
 
 using namespace std;
 
-void getHost_byName(char* hostname, char* ip);
+void getHost_byName(char* hostname, string& ip);
 int read(char* address, int socket_desc, char* hostname);
 string getFileName(char* hostname);
-int process(char *hostname, int socket_desc);
-int readSubLinks();
+int process(char *hostname, int socket_desc, int level);
+int readSubLinks(int level, char* hostname);
 
 string hm;
 string protocol;
 string tail;
 
-char* fileNameToParse;
+vector<int> socketList;
+
 static void show_usage(std::string name)
 {
     std::cerr << "Usage: <option(s)> SOURCES"
@@ -61,6 +62,7 @@ static const struct option longOpts[] = {
 
 static struct globalArgs_t
 {
+    char* url;
     bool recursive;
     bool noparent;
     bool verbosity;
@@ -78,6 +80,7 @@ static struct returnCodeStruct
     int code;
 } returnCode;
 
+
 int main(int argc, char **argv)
 {
     if (argc < 2) {
@@ -92,7 +95,6 @@ int main(int argc, char **argv)
     globalArgs.level = 1;
     globalArgs.tries = 1;
 
-    char* hostname;
     if (globalArgs.verbosity)
     {
         puts("Start");
@@ -110,7 +112,7 @@ int main(int argc, char **argv)
                 return 0;
 
             case 'u':
-                 hostname = optarg;
+                globalArgs.url = optarg;
                 break;
 
             case 'l':
@@ -154,6 +156,7 @@ int main(int argc, char **argv)
     }
     //create socket
     int socket_desc = socket(AF_INET, SOCK_STREAM, 0);
+    socketList.push_back(socket_desc);
 
     if (socket_desc == -1)
     {
@@ -161,25 +164,25 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    if (!globalArgs.filename.empty())
-    {
-        puts("Reading urls from file");
-        std::string s;
-        ifstream file(globalArgs.filename);
+    //if (!globalArgs.filename.empty())
+    //{
+    //    puts("Reading urls from file");
+    //    std::string s;
+    //    ifstream file(globalArgs.filename);/
 
-        while(getline(file, s)){
-            cout << s << endl;
-            process(const_cast<char*>(s.c_str()), socket_desc);
-        }
+    //    while(getline(file, s)){
+    //        cout << s << endl;
+    //        process(const_cast<char*>(s.c_str()), socket_desc);
+    //    }
 
-        file.close();
-    }
+    //    file.close();
+    //}
 
     if (globalArgs.verbosity)
     {
         puts("Process");
     }
-    int success = process(hostname, socket_desc);
+    int success = process(globalArgs.url, socket_desc, globalArgs.level);
     if (success != 0)
     {
         puts("Can't process");
@@ -190,13 +193,19 @@ int main(int argc, char **argv)
     {
         puts("Close socket");
     }
-	close(socket_desc);
+    if (!socketList.empty())
+    {
+	for (int j : socketList)
+	{
+		close(j);
+	}
+    }
     return 0;
 }
 
-int process(char *hostname, int socket_desc)
+int process(char *hostname, int socket_desc, int level)
 {
-    char* ip = new char;
+    string ip;
 
     if (globalArgs.verbosity)
     {
@@ -218,44 +227,59 @@ int process(char *hostname, int socket_desc)
     {
         puts("Get host by name");
     }
+
+    int tries = globalArgs.tries;
+
     getHost_byName(const_cast<char*>(hm.c_str()), ip);
 
     if (globalArgs.verbosity)
     {
         cout << "IP: ";
-        puts(ip);
+        cout << ip << endl;
     }
 
     if (globalArgs.verbosity)
     {
         puts("Read");
     }
-    int success = read(ip, socket_desc, hostname);
+
+    int success = read(const_cast<char*>(ip.c_str()), socket_desc, hostname);
     if (success == 1)
     {
-        if (returnCode.code > 0 && (globalArgs.tries > 0))
+        if (returnCode.code > 0 && (tries > 0))
         {
             socket_desc = socket(AF_INET, SOCK_STREAM, 0);
+            socketList.push_back(socket_desc);
+
 
             if (socket_desc == -1)
             {
                 puts("could not create socket");
                 return 1;
             }
-            globalArgs.tries -= 1;
+            //globalArgs.tries -= 1;
             if (globalArgs.verbosity)
             {
                 cout << "New location "<< returnCode.location <<endl ;
-                cout << "Attempt number: " << globalArgs.tries << endl;
+                cout << "Attempt number: " << tries << endl;
             }
-            process(const_cast<char*>(returnCode.location.c_str()), socket_desc);
+            tries -= 1;
+            process(const_cast<char*>(returnCode.location.c_str()), socket_desc, level);
         }
-        puts("Cann't read");
+        //puts("Cann't read");
         return 1;
     }
     else if (success == 2)
     {
-        int ok = readSubLinks();
+        if (level - 1 != 0 )
+        {
+            int ok = readSubLinks(level-1, hostname);
+        }
+    }
+    else if (success == 3)
+    {
+        if (hostname == globalArgs.url)
+            return 1;
     }
     hm.clear();
     protocol.clear();
@@ -263,18 +287,20 @@ int process(char *hostname, int socket_desc)
     return 0;
 }
 
-int readSubLinks()
+int readSubLinks(int level, char* hostname)
 {
+    cout << "sublinks" << endl;
      vector<string> linkList;
-     cout << "parsehtml()"<<linkList.size() << endl;
-     parse_html(linkList, fileNameToParse, const_cast<char*>(hm.c_str()), globalArgs.noparent, globalArgs.level);
+     parse_html(linkList, getFileName(hostname), const_cast<char*>(hm.c_str()), globalArgs.noparent, level+1);
 
-     cout << "size"<<linkList.size() << endl;
+     cout << "size "<<linkList.size() << endl;
      if (!linkList.empty())
      {
          for(string i : linkList)
          {
                 int socket_desc = socket(AF_INET, SOCK_STREAM, 0);
+                socketList.push_back(socket_desc);
+
 
                 if (socket_desc == -1)
                 {
@@ -285,7 +311,7 @@ int readSubLinks()
                 {
                     cout << "Link to process: "<< i <<endl ;
                 }
-                process(const_cast<char*>(const_cast<char*> (i.c_str())), socket_desc);
+                process(const_cast<char*>(const_cast<char*> (i.c_str())), socket_desc, level);
           }
       }
 
@@ -365,28 +391,39 @@ int read(char* address, int socket_desc, char* hostname)
 		else
 		{
             fout << chunk;
-            if (globalArgs.verbosity)
-                printf("%s" , chunk);
+            //if (globalArgs.verbosity)
+            //    printf("%s" , chunk);
 		}
 	}
     fout.close();
 
     if (globalArgs.verbosity)
         puts("Analize response");
+
     parse_error(filename, returnCode.error, returnCode.code, returnCode.location);
-    if (returnCode.code != 200 && (globalArgs.tries > 0))
+
+    if (globalArgs.verbosity)
+        cout << "CODE: "<<returnCode.code << endl;
+
+    if (returnCode.code >= 500 && returnCode.code < 600)
+    {
+        if (globalArgs.verbosity)
+            cout << "Status code: " << returnCode.code << endl;
+        return 3;
+    }
+    if (returnCode.code >=300 && returnCode.code < 400)
     {
         if (globalArgs.verbosity)
             cout << "Status code: " << returnCode.code << endl;
         return 1;
     }
-
     if (returnCode.code == 200 && globalArgs.recursive && globalArgs.level > 1)
     {
-        puts("Recursive");
-        fileNameToParse = const_cast<char*>(filename.c_str());
+        if (globalArgs.verbosity)
+            cout << "Status code: " << returnCode.code << " recursive with level "<< globalArgs.level <<endl;
         return 2;
     }
+
     return 0;
 }
 
@@ -410,7 +447,7 @@ string getFileName(char* hostname)
     return str;
 }
 
-void getHost_byName(char* hostname, char *ip)
+void getHost_byName(char* hostname, string &ip)
 {
     struct hostent *he;
     struct in_addr **addr_list;
@@ -425,12 +462,12 @@ void getHost_byName(char* hostname, char *ip)
     //also has the ip address in long format only
 	addr_list = (struct in_addr **) he->h_addr_list;
 
-	for(int i = 0; addr_list[i] != NULL; i++)
-	{
-		strcpy(ip , inet_ntoa(*addr_list[i]) );
-	}
+	//for(int i = 0; addr_list[i] != NULL; i++)
+	//{
+		ip += string(inet_ntoa(*addr_list[0])) ;
+	//}
 
-	if (strlen(ip) == 0)
+	if (ip.empty())
 	{
         puts("Cannot get ip from hostname");
         return;
