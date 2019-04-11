@@ -63,7 +63,7 @@ void parse_hostname(string addr, string &protocol, string &hostname, string &tai
 
 	regex_search(tmp, match, host2_regex);
 
-	hostname = match.prefix();  //тут надо убирать www или нет?
+	hostname = match.prefix();  //ГІГіГІ Г­Г Г¤Г® ГіГЎГЁГ°Г ГІГј www ГЁГ«ГЁ Г­ГҐГІ?
 	tail = match.suffix();
 	
 }
@@ -127,7 +127,43 @@ void parse_error(string filename, string &error, int& err_num, string &location)
 }
 
 
+void parse_img_link(vector<string> &link_list, string string_to_parse)
+{
+	regex http_regex("<img.*src.*=.*\".*(?=\" )");
 
+	regex link_regex("(https{0,1}:/){0,1}/+.*");
+
+	smatch http_match;
+	smatch link_match;
+
+	string tmp;
+	string buf;
+
+	if (regex_search(string_to_parse, http_match, http_regex)) 
+	{
+
+		for (size_t i = 0; i < http_match.size(); ++i)
+		{
+			tmp = http_match[i].str();
+			if (regex_search(tmp, link_match, link_regex))
+			{
+				for (size_t j = 0; j < link_match.size(); ++j)
+				{
+					if (link_match[j].matched)
+					{
+						buf = link_match[j];
+						link_list.push_back(link_match[j]);
+					}
+					
+				}
+			}
+
+
+		}
+	}
+
+
+}
 
 
 int main()
@@ -139,6 +175,7 @@ int main()
 
 	string test_line = "<a class=gb1 href=\"http://www.google.co/\">Rasmlar</a>, next <a href=\"https://mail.ru\">Gmail< / a>";
 
+	string img_line = "<img src = \"/html/images/test.png\" alt = \"Simply Easy Learning\"";
 	//find <a href = .... 
 
 	regex http_regex("<a.*=.*\"https{0,1}://.*(?=\"\>)");
@@ -178,5 +215,9 @@ int main()
 
 	parse_error("in.txt", error, err_num, location);
 
-	cout << error << " " << err_num << " " << location << "\n";
+	cout << error << " " << err_num << " " << location << "\n\n";
+
+	parse_img_link(link_list, img_line);
+
+	cout << link_list[link_list.size()-1] << "\n";
 }
