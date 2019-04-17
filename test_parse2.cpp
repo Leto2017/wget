@@ -6,6 +6,43 @@
 
 using namespace std;
 
+//recursive parsing
+void parse_link_r(vector<string> &link_list, string string_to_parse)
+{
+	
+	const char *rg = R"((http|ftp|https)://([\w_-]+(?:(?:\.[\w_-]+)+))([\w.,@?^=%&:/~+#-]*[\w@?^=%&/~+#-])?)";
+
+	const char *rg_h = R"(<a\s*[^>]*href\s*=[^>]*>)";
+
+	
+	regex http_regex(rg_h);
+	regex link_regex(rg);
+
+
+	smatch http_match;
+	smatch link_match;
+
+	string tmp;
+
+	string tmps = string_to_parse;
+
+	while (regex_search(tmps, http_match, http_regex))
+	{
+		tmp = http_match.str();
+
+		//cout << tmp << "\n";
+
+		tmps = http_match.suffix();
+
+		if (regex_search(tmp, link_match, link_regex))
+		{
+			link_list.push_back(link_match.str());
+		}
+
+	}
+
+}
+
 void parse_link(vector<string> &link_list, string string_to_parse)
 {
 	regex http_regex("<a.*=.*\"https{0,1}://.*(?=\"\>)");
